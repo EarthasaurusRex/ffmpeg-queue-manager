@@ -3,6 +3,7 @@ import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { Switch, SpinButton, Field, Button, tokens } from "@fluentui/react-components";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { getVersion } from "@tauri-apps/api/app";
 
 interface SettingsTabProps {
   maxConcurrency: number;
@@ -15,6 +16,11 @@ interface SettingsTabProps {
 export default function SettingsTab({ maxConcurrency, setMaxConcurrency, autoClear, setAutoClear, classes }: SettingsTabProps) {
   const [autostartEnabled, setAutostartEnabled] = useState(false);
   const [updateStatus, setUpdateStatus] = useState("Idle");
+  const [appVersion, setAppVersion] = useState("v...");
+
+  useEffect(() => {
+    getVersion().then(v => setAppVersion(`v${v}`)).catch(console.error);
+  }, []);
 
   const checkForUpdates = async () => {
     try {
@@ -67,7 +73,10 @@ export default function SettingsTab({ maxConcurrency, setMaxConcurrency, autoCle
   return (
     <div className={classes.profilesGrid}>
       <div className={classes.profileCard}>
-        <h3>Application Settings</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3>Application Settings</h3>
+          <span style={{ fontSize: "12px", color: tokens.colorNeutralForeground3, fontWeight: "bold" }}>{appVersion}</span>
+        </div>
         
         <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 15 }}>
           <Field label="Run on Startup" hint="Automatically launch the app silently in the background when you log in.">
