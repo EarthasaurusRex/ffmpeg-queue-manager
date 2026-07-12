@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { readTextFile } from "@tauri-apps/plugin-fs";
 import { Field, Input, Textarea, Button, tokens } from "@fluentui/react-components";
 import { Profile } from "../types";
 
@@ -50,7 +49,7 @@ export default function ProfilesTab({ profiles, loadProfiles, classes }: Profile
 
       for (const file of files) {
         const path = file;
-        const contents = await readTextFile(path);
+        const contents = await invoke<string>("read_profile_file", { path });
         const parsed = JSON.parse(contents);
         
         if (parsed.name && Array.isArray(parsed.args)) {

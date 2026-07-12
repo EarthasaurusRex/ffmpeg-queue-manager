@@ -82,6 +82,11 @@ fn delete_profile(name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn read_profile_file(path: String) -> Result<String, String> {
+    fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn generate_shortcuts(_app: AppHandle) -> Result<String, String> {
     let exe_path = env::current_exe().map_err(|e| e.to_string())?;
     let profiles_dir = get_profiles_dir()?;
@@ -148,7 +153,8 @@ pub fn run() {
             generate_shortcuts,
             get_profiles,
             save_profile,
-            delete_profile
+            delete_profile,
+            read_profile_file
         ])
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {
