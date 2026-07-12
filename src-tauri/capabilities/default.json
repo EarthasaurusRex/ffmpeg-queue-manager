@@ -10,6 +10,8 @@
     "opener:default",
     "shell:default",
     "os:default",
+    "updater:default",
+    "process:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [
