@@ -14,8 +14,8 @@ export default function ProfilesTab({ profiles, loadProfiles, classes }: Profile
   const [newProfileName, setNewProfileName] = useState("");
   const [newProfileArgs, setNewProfileArgs] = useState("-c:v libx264 -crf 23 -c:a aac");
   const [newProfilePrefix, setNewProfilePrefix] = useState("");
-  const [newProfileSuffix, setNewProfileSuffix] = useState("_processed");
-  const [newProfileExtension, setNewProfileExtension] = useState(".mp4");
+  const [newProfileSuffix, setNewProfileSuffix] = useState("");
+  const [newProfileExtension, setNewProfileExtension] = useState("");
 
   const handleOpenFolder = async () => {
     try {
@@ -39,12 +39,22 @@ export default function ProfilesTab({ profiles, loadProfiles, classes }: Profile
       setNewProfileName("");
       setNewProfileArgs("-c:v libx264 -crf 23 -c:a aac");
       setNewProfilePrefix("");
-      setNewProfileSuffix("_processed");
-      setNewProfileExtension(".mp4");
+      setNewProfileSuffix("");
+      setNewProfileExtension("");
       loadProfiles();
     } catch (err) {
       alert("Error saving profile: " + err);
     }
+  };
+
+  const handleEditProfile = (p: Profile) => {
+    setNewProfileName(p.name);
+    setNewProfileArgs(p.args.join(" "));
+    setNewProfilePrefix(p.prefix || "");
+    setNewProfileSuffix(p.suffix || "");
+    setNewProfileExtension(p.extension || "");
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDeleteProfile = async (name: string) => {
@@ -98,7 +108,7 @@ export default function ProfilesTab({ profiles, loadProfiles, classes }: Profile
   return (
     <div className={classes.profilesGrid}>
       <div className={classes.profileCard}>
-        <h3>Create New Profile</h3>
+        <h3>Create / Edit Profile</h3>
         <Field label="Profile Name">
           <Input 
             value={newProfileName} 
@@ -158,7 +168,10 @@ export default function ProfilesTab({ profiles, loadProfiles, classes }: Profile
             <div key={p.name} className={classes.profileCard} style={{ marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <strong>{p.name}</strong>
-                <Button appearance="transparent" onClick={() => handleDeleteProfile(p.name)}>Delete</Button>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <Button appearance="transparent" onClick={() => handleEditProfile(p)}>Edit</Button>
+                  <Button appearance="transparent" onClick={() => handleDeleteProfile(p.name)}>Delete</Button>
+                </div>
               </div>
               <code style={{ display: "block", marginTop: 5, padding: 5, backgroundColor: tokens.colorNeutralBackground3 }}>
                 {p.args.join(" ")}

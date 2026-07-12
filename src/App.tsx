@@ -253,15 +253,17 @@ export default function App() {
         appendLog(nextJob.id, `[SYSTEM] Detected ${acount} audio tracks`);
 
         const inputPath = nextJob.filePath;
-        const ext = profile.extension || ".mp4";
-        let resolvedPrefix = profile.prefix || "";
-        let resolvedSuffix = profile.suffix || "_processed";
-        resolvedSuffix = resolvedSuffix.replace("{{MASTER_RAW}}", acount > 1 ? " Master+Raw" : "");
-
         const lastSlashIdx = Math.max(inputPath.lastIndexOf('/'), inputPath.lastIndexOf('\\'));
         const dir = inputPath.substring(0, lastSlashIdx + 1);
         const filename = inputPath.substring(lastSlashIdx + 1);
+        const extMatch = filename.match(/(\.[^.]+)$/);
+        const originalExt = extMatch ? extMatch[1] : ".mp4";
         const basename = filename.replace(/\.[^/.]+$/, "");
+
+        const ext = profile.extension || originalExt;
+        let resolvedPrefix = profile.prefix || "";
+        let resolvedSuffix = profile.suffix || "";
+        resolvedSuffix = resolvedSuffix.replace("{{MASTER_RAW}}", acount > 1 ? " Master+Raw" : "");
 
         const outputPath = dir + resolvedPrefix + basename + resolvedSuffix + ext;
         
