@@ -11,6 +11,8 @@ pub struct Profile {
     name: String,
     args: Vec<String>,
     #[serde(default)]
+    prefix: Option<String>,
+    #[serde(default)]
     extension: Option<String>,
     #[serde(default)]
     suffix: Option<String>,
@@ -41,6 +43,7 @@ fn get_profiles() -> Result<Vec<Profile>, String> {
                             name: path.file_stem().unwrap().to_string_lossy().to_string(),
                             args: profile_data.args,
                             extension: profile_data.extension,
+                            prefix: profile_data.prefix,
                             suffix: profile_data.suffix,
                         });
                     }
@@ -55,6 +58,7 @@ fn get_profiles() -> Result<Vec<Profile>, String> {
 fn save_profile(
     name: String,
     args: Vec<String>,
+    prefix: Option<String>,
     extension: Option<String>,
     suffix: Option<String>,
 ) -> Result<(), String> {
@@ -63,6 +67,7 @@ fn save_profile(
     let profile = Profile {
         name: name.clone(),
         args,
+        prefix,
         extension,
         suffix,
     };
@@ -84,6 +89,16 @@ fn delete_profile(name: String) -> Result<(), String> {
 #[tauri::command]
 fn read_profile_file(path: String) -> Result<String, String> {
     fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn open_profiles_folder() -> Result<(), String> {
+    let profiles_dir = get_profiles_dir()?;
+    std::process::Command::new("explorer")
+        .arg(profiles_dir)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -154,7 +169,8 @@ pub fn run() {
             get_profiles,
             save_profile,
             delete_profile,
-            read_profile_file
+            read_profile_file,
+            open_profiles_folder
         ])
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {

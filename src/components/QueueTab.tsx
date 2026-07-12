@@ -16,16 +16,21 @@ import { Job, JobStatus } from "../types";
 interface QueueTabProps {
   jobs: Job[];
   setJobs: React.Dispatch<React.SetStateAction<Job[]>>;
+  stopJob: (jobId: string) => Promise<void>;
   terminalRefs: React.MutableRefObject<{ [key: string]: HTMLDivElement | null }>;
   handleGenerateShortcuts: () => void;
   classes: any;
 }
 
-export default function QueueTab({ jobs, setJobs, terminalRefs, handleGenerateShortcuts, classes }: QueueTabProps) {
+export default function QueueTab({ jobs, setJobs, stopJob, terminalRefs, handleGenerateShortcuts, classes }: QueueTabProps) {
   const toggleTerminal = (jobId: string) => {
     setJobs((prev) =>
       prev.map((j) => (j.id === jobId ? { ...j, expandedTerminal: !j.expandedTerminal } : j))
     );
+  };
+
+  const clearJob = (jobId: string) => {
+    setJobs((prev) => prev.filter((j) => j.id !== jobId));
   };
 
   const getStatusBadge = (status: JobStatus) => {
@@ -96,9 +101,21 @@ export default function QueueTab({ jobs, setJobs, terminalRefs, handleGenerateSh
                   )}
                 </TableCell>
                 <TableCell>
-                  <Button size="small" onClick={() => toggleTerminal(job.id)}>
-                    {job.expandedTerminal ? "Hide Terminal" : "Terminal"}
-                  </Button>
+                  <div style={{ display: "flex", gap: "5px" }}>
+                    <Button size="small" onClick={() => toggleTerminal(job.id)}>
+                      {job.expandedTerminal ? "Hide Logs" : "Logs"}
+                    </Button>
+                    {(job.status === "Running" || job.status === "Queued") && (
+                      <Button size="small" appearance="subtle" style={{ color: tokens.colorPaletteRedForeground1 }} onClick={() => stopJob(job.id)}>
+                        Stop
+                      </Button>
+                    )}
+                    {(job.status === "Completed" || job.status === "Error") && (
+                      <Button size="small" appearance="subtle" onClick={() => clearJob(job.id)}>
+                        Clear
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>,
               job.expandedTerminal && (

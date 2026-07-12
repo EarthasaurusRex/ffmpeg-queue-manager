@@ -13,14 +13,34 @@ interface ProfilesTabProps {
 export default function ProfilesTab({ profiles, loadProfiles, classes }: ProfilesTabProps) {
   const [newProfileName, setNewProfileName] = useState("");
   const [newProfileArgs, setNewProfileArgs] = useState("-c:v libx264 -crf 23 -c:a aac");
+  const [newProfilePrefix, setNewProfilePrefix] = useState("");
+  const [newProfileSuffix, setNewProfileSuffix] = useState("_processed");
+  const [newProfileExtension, setNewProfileExtension] = useState(".mp4");
+
+  const handleOpenFolder = async () => {
+    try {
+      await invoke("open_profiles_folder");
+    } catch (err) {
+      alert("Error opening folder: " + err);
+    }
+  };
 
   const handleSaveProfile = async () => {
     if (!newProfileName) return;
     try {
       const argsArray = newProfileArgs.match(/(?:[^\s"]+|"[^"]*")+/g)?.map(arg => arg.replace(/(^"|"$)/g, '')) || [];
-      await invoke("save_profile", { name: newProfileName, args: argsArray, extension: null, suffix: null });
+      await invoke("save_profile", { 
+        name: newProfileName, 
+        args: argsArray, 
+        prefix: newProfilePrefix || null,
+        extension: newProfileExtension || null, 
+        suffix: newProfileSuffix || null 
+      });
       setNewProfileName("");
       setNewProfileArgs("-c:v libx264 -crf 23 -c:a aac");
+      setNewProfilePrefix("");
+      setNewProfileSuffix("_processed");
+      setNewProfileExtension(".mp4");
       loadProfiles();
     } catch (err) {
       alert("Error saving profile: " + err);
@@ -56,6 +76,7 @@ export default function ProfilesTab({ profiles, loadProfiles, classes }: Profile
           await invoke("save_profile", { 
             name: parsed.name, 
             args: parsed.args, 
+            prefix: parsed.prefix || null,
             extension: parsed.extension || null, 
             suffix: parsed.suffix || null 
           });
@@ -92,12 +113,38 @@ export default function ProfilesTab({ profiles, loadProfiles, classes }: Profile
             placeholder="-c:v libx264 -crf 23 -c:a aac" 
           />
         </Field>
+        <div style={{ display: "flex", gap: "10px", marginTop: 10 }}>
+          <Field label="Prefix (Optional)">
+            <Input 
+              value={newProfilePrefix} 
+              onChange={e => setNewProfilePrefix(e.target.value)} 
+              placeholder="e.g. encoded_" 
+            />
+          </Field>
+          <Field label="Suffix (Optional)">
+            <Input 
+              value={newProfileSuffix} 
+              onChange={e => setNewProfileSuffix(e.target.value)} 
+              placeholder="e.g. _processed" 
+            />
+          </Field>
+          <Field label="Extension (Optional)">
+            <Input 
+              value={newProfileExtension} 
+              onChange={e => setNewProfileExtension(e.target.value)} 
+              placeholder="e.g. .mp4" 
+            />
+          </Field>
+        </div>
         <div style={{ marginTop: 10, display: "flex", gap: "10px" }}>
           <Button appearance="primary" onClick={handleSaveProfile}>
             Save Profile
           </Button>
           <Button appearance="secondary" onClick={handleImportProfile}>
             Import Profile(s)
+          </Button>
+          <Button appearance="transparent" onClick={handleOpenFolder}>
+            Open Profiles Folder
           </Button>
         </div>
       </div>
@@ -116,6 +163,11 @@ export default function ProfilesTab({ profiles, loadProfiles, classes }: Profile
               <code style={{ display: "block", marginTop: 5, padding: 5, backgroundColor: tokens.colorNeutralBackground3 }}>
                 {p.args.join(" ")}
               </code>
+              <div style={{ display: "flex", gap: "15px", marginTop: "5px", fontSize: "12px", color: tokens.colorNeutralForeground3 }}>
+                <span><strong>Prefix:</strong> {p.prefix || "(none)"}</span>
+                <span><strong>Suffix:</strong> {p.suffix || "(none)"}</span>
+                <span><strong>Extension:</strong> {p.extension || "(none)"}</span>
+              </div>
             </div>
           ))
         )}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Command } from "@tauri-apps/plugin-shell";
+import { Command, Child } from "@tauri-apps/plugin-shell";
 import {
   makeStyles,
   tokens,
@@ -98,6 +98,18 @@ export default function App() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const jobsRef = useRef(jobs);
   const activeRunners = useRef(0);
+  const activeProcesses = useRef<{ [jobId: string]: Child }>({});
+
+  const stopJob = async (jobId: string) => {
+    if (activeProcesses.current[jobId]) {
+      try {
+        await activeProcesses.current[jobId].kill();
+      } catch (err) {
+        console.error("Error killing process:", err);
+      }
+    }
+    setJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, status: "Error", progress: 0 } : j));
+  };
 
   // Terminal Auto-scrollers
   const terminalRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -242,10 +254,16 @@ export default function App() {
 
         const inputPath = nextJob.filePath;
         const ext = profile.extension || ".mp4";
+        let resolvedPrefix = profile.prefix || "";
         let resolvedSuffix = profile.suffix || "_processed";
         resolvedSuffix = resolvedSuffix.replace("{{MASTER_RAW}}", acount > 1 ? " Master+Raw" : "");
 
-        const outputPath = inputPath.replace(/\.[^/.]+$/, "") + resolvedSuffix + ext;
+        const lastSlashIdx = Math.max(inputPath.lastIndexOf('/'), inputPath.lastIndexOf('\\'));
+        const dir = inputPath.substring(0, lastSlashIdx + 1);
+        const filename = inputPath.substring(lastSlashIdx + 1);
+        const basename = filename.replace(/\.[^/.]+$/, "");
+
+        const outputPath = dir + resolvedPrefix + basename + resolvedSuffix + ext;
         
         let finalArgs: string[] = [];
         for (let i = 0; i < profile.args.length; i++) {
@@ -365,11 +383,15 @@ export default function App() {
                appendLog(nextJob.id, `[SYSTEM ERROR] Failed to run FFmpeg: ${err}`);
                resolve(-1);
            });
-           cmd.spawn().catch((err) => {
+           cmd.spawn().then(child => {
+             activeProcesses.current[nextJob.id] = child;
+           }).catch((err) => {
                appendLog(nextJob.id, `[SYSTEM ERROR] Failed to spawn FFmpeg: ${err}`);
                resolve(-1);
            });
         });
+        
+        delete activeProcesses.current[nextJob.id];
         
         appendLog(nextJob.id, `[SYSTEM] Job finished with exit code: ${code}`);
 
@@ -437,6 +459,7 @@ export default function App() {
           <QueueTab 
             jobs={jobs} 
             setJobs={setJobs} 
+            stopJob={stopJob}
             terminalRefs={terminalRefs} 
             handleGenerateShortcuts={handleGenerateShortcuts} 
             classes={classes} 

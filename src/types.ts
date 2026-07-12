@@ -16,6 +16,7 @@ export interface Job {
 export interface Profile {
   name: string;
   args: string[];
+  prefix?: string;
   extension?: string;
   suffix?: string;
 }
