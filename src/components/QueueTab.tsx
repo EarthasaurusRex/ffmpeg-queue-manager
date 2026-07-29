@@ -9,8 +9,15 @@ import {
   TableCellLayout,
   Badge,
   ProgressBar,
+  Menu,
+  MenuTrigger,
+  MenuList,
+  MenuItem,
+  MenuPopover,
   tokens,
 } from "@fluentui/react-components";
+import { MoreHorizontal20Regular } from "@fluentui/react-icons";
+import { Command } from "@tauri-apps/plugin-shell";
 import { Job, JobStatus } from "../types";
 
 interface QueueTabProps {
@@ -39,6 +46,15 @@ export default function QueueTab({ jobs, setJobs, stopJob, terminalRefs, handleG
       case "Running": return <Badge color="brand" appearance="filled">Running</Badge>;
       case "Completed": return <Badge color="success" appearance="filled">Completed</Badge>;
       case "Error": return <Badge color="danger" appearance="filled">Error</Badge>;
+    }
+  };
+
+  const showInExplorer = async (filePath: string) => {
+    try {
+      // Use cmd /c explorer /select, "C:\path\to\file"
+      await Command.create("cmd", ["/c", "explorer", "/select,", filePath.replace(/\//g, '\\')]).execute();
+    } catch (err) {
+      console.error("Failed to open explorer", err);
     }
   };
 
@@ -115,6 +131,16 @@ export default function QueueTab({ jobs, setJobs, stopJob, terminalRefs, handleG
                         Clear
                       </Button>
                     )}
+                    <Menu>
+                      <MenuTrigger disableButtonEnhancement>
+                        <Button size="small" appearance="subtle" icon={<MoreHorizontal20Regular />} />
+                      </MenuTrigger>
+                      <MenuPopover>
+                        <MenuList>
+                          <MenuItem onClick={() => showInExplorer(job.filePath)}>Show in Explorer</MenuItem>
+                        </MenuList>
+                      </MenuPopover>
+                    </Menu>
                   </div>
                 </TableCell>
               </TableRow>,
