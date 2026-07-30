@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { stat } from "@tauri-apps/plugin-fs";
 import { Command, Child } from "@tauri-apps/plugin-shell";
 import {
   makeStyles,
@@ -412,6 +413,21 @@ export default function App() {
         
         appendLog(nextJob.id, `[SYSTEM] Job finished with exit code: ${code}`);
 
+        let finalCompressionRatio: string | undefined;
+        if (code === 0) {
+          try {
+            const inStat = await stat(inputPath);
+            const outStat = await stat(outputPath);
+            if (inStat.size > 0 && outStat.size > 0) {
+              const ratio = (outStat.size / inStat.size) * 100;
+              finalCompressionRatio = ratio.toFixed(1) + "% of original";
+              appendLog(nextJob.id, `[SYSTEM] Final size: ${finalCompressionRatio}`);
+            }
+          } catch (err) {
+            appendLog(nextJob.id, `[SYSTEM ERROR] Failed to stat files: ${err}`);
+          }
+        }
+
         setJobs((prev) =>
           prev.map((j) =>
             j.id === nextJob.id
@@ -419,6 +435,7 @@ export default function App() {
                   ...j,
                   status: code === 0 ? "Completed" : "Error",
                   progress: code === 0 ? 100 : j.progress,
+                  compressionRatio: finalCompressionRatio || j.compressionRatio,
                 }
               : j
           )

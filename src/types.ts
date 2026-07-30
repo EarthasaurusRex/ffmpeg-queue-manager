@@ -12,6 +12,7 @@ export interface Job {
   bitrate?: string;
   eta?: string;
   estSize?: string;
+  compressionRatio?: string;
 }
 
 export interface Profile {
