@@ -112,6 +112,7 @@ export default function QueueTab({ jobs, setJobs, stopJob, terminalRefs, handleG
                     <div className={classes.statsText}>
                       {job.fps ? `${job.fps} fps • ` : ""}
                       {job.bitrate ? `${job.bitrate} • ` : ""}
+                      {job.estSize ? `Est. ${job.estSize} • ` : ""}
                       ETA: {job.eta || "--:--"}
                     </div>
                   )}

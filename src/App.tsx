@@ -326,13 +326,27 @@ export default function App() {
             let bitrateStr: string | undefined;
             let speedStr: string | undefined;
             let etaStr: string | undefined;
+            let estSizeStr: string | undefined;
             let currentProgress = -1;
 
             const fpsMatch = line.match(/fps=\s*([\d.]+)/);
             if (fpsMatch) fpsStr = fpsMatch[1];
 
-            const bitrateMatch = line.match(/bitrate=\s*([\d.]+\s*kbits\/s)/);
-            if (bitrateMatch) bitrateStr = bitrateMatch[1];
+            const bitrateMatch = line.match(/bitrate=\s*([\d.]+)\s*kbits\/s/);
+            if (bitrateMatch) {
+               bitrateStr = bitrateMatch[1] + "kbits/s";
+               if (totalDurationSeconds > 0) {
+                  const kbps = parseFloat(bitrateMatch[1]);
+                  if (kbps > 0) {
+                     const totalMB = (kbps * totalDurationSeconds) / (8 * 1024);
+                     if (totalMB >= 1024) {
+                        estSizeStr = (totalMB / 1024).toFixed(2) + " GB";
+                     } else {
+                        estSizeStr = totalMB.toFixed(2) + " MB";
+                     }
+                  }
+               }
+            }
 
             const speedMatch = line.match(/speed=\s*([\d.]+)x/);
             if (speedMatch) speedStr = speedMatch[1];
@@ -360,7 +374,7 @@ export default function App() {
             }
 
             // Update state if anything changed
-            if (currentProgress >= 0 || fpsStr || bitrateStr || etaStr) {
+            if (currentProgress >= 0 || fpsStr || bitrateStr || etaStr || estSizeStr) {
               setJobs((prev) =>
                 prev.map((j) => {
                   if (j.id === nextJob.id) {
@@ -369,7 +383,8 @@ export default function App() {
                       progress: currentProgress >= 0 ? currentProgress : j.progress,
                       fps: fpsStr || j.fps,
                       bitrate: bitrateStr || j.bitrate,
-                      eta: etaStr || j.eta
+                      eta: etaStr || j.eta,
+                      estSize: estSizeStr || j.estSize
                     };
                   }
                   return j;

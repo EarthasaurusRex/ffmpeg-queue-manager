@@ -11,6 +11,7 @@ export interface Job {
   fps?: string;
   bitrate?: string;
   eta?: string;
+  estSize?: string;
 }
 
 export interface Profile {
