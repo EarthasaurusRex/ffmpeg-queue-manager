@@ -6,9 +6,9 @@ use crate::models::{
     ProfileWithPath, APP_VERSION,
 };
 use crate::paths::{
-    fetch_latest_github_release, format_bytes, get_app_data_dir, get_profiles_dir,
-    is_autostart_enabled, open_folder_in_explorer, open_with_default_app, remove_daemon_info,
-    set_autostart_enabled, show_in_explorer,
+    download_and_run_installer, fetch_latest_github_release, format_bytes, get_app_data_dir,
+    get_profiles_dir, is_autostart_enabled, open_folder_in_explorer, open_with_default_app,
+    remove_daemon_info, set_autostart_enabled, show_in_explorer,
 };
 use crate::probe::probe_media_detailed;
 use crate::profiles::{
@@ -75,7 +75,9 @@ struct InspectorState {
 struct UpdateCheckState {
     status: String,
     release_url: Option<String>,
+    setup_url: Option<String>,
     checking: bool,
+    installing: bool,
 }
 
 pub struct QueueManagerApp {
@@ -211,7 +213,9 @@ impl QueueManagerApp {
             update_state: Arc::new(Mutex::new(UpdateCheckState {
                 status: "Idle".to_string(),
                 release_url: None,
+                setup_url: None,
                 checking: false,
+                installing: false,
             })),
             _tray_icon: tray_icon,
             quit_requested,
@@ -1601,13 +1605,20 @@ impl QueueManagerApp {
                     ui.add_space(6.0);
 
                     // Updates checker
-                    let upd_snapshot = {
+                    let (upd_checking, upd_installing, upd_status, upd_release_url, upd_setup_url) = {
                         let g = self.update_state.lock().unwrap();
-                        (g.checking, g.status.clone(), g.release_url.clone())
+                        (
+                            g.checking,
+                            g.installing,
+                            g.status.clone(),
+                            g.release_url.clone(),
+                            g.setup_url.clone(),
+                        )
                     };
-                    ui.horizontal(|ui| {
+                    let busy = upd_checking || upd_installing;
+                    ui.horizontal_wrapped(|ui| {
                         if ui
-                            .add_enabled(!upd_snapshot.0, egui::Button::new("Check for Updates"))
+                            .add_enabled(!busy, egui::Button::new("Check for Updates"))
                             .clicked()
                         {
                             let st = self.update_state.clone();
@@ -1617,6 +1628,7 @@ impl QueueManagerApp {
                                 g.checking = true;
                                 g.status = "Checking GitHub releases...".to_string();
                                 g.release_url = None;
+                                g.setup_url = None;
                             }
                             thread::spawn(move || {
                                 let res = fetch_latest_github_release();
@@ -1624,16 +1636,17 @@ impl QueueManagerApp {
                                     let mut g = st.lock().unwrap();
                                     g.checking = false;
                                     match res {
-                                        Ok((tag, url)) => {
-                                            let clean_tag = tag.trim_start_matches('v');
+                                        Ok(info) => {
+                                            let clean_tag = info.tag.trim_start_matches('v');
                                             if clean_tag == APP_VERSION {
                                                 g.status = format!(
                                                     "You are on the latest version (v{}).",
                                                     APP_VERSION
                                                 );
                                             } else {
-                                                g.status = format!("Release {} is available!", tag);
-                                                g.release_url = Some(url);
+                                                g.status = format!("Release {} is available!", info.tag);
+                                                g.release_url = Some(info.html_url);
+                                                g.setup_url = info.setup_download_url;
                                             }
                                         }
                                         Err(e) => {
@@ -1645,10 +1658,44 @@ impl QueueManagerApp {
                             });
                         }
 
-                        if upd_snapshot.1 != "Idle" {
-                            ui.label(&upd_snapshot.1);
+                        if upd_status != "Idle" {
+                            ui.label(&upd_status);
                         }
-                        if let Some(ref url) = upd_snapshot.2 {
+                        if let Some(ref dl_url) = upd_setup_url {
+                            if ui
+                                .add_enabled(!busy, egui::Button::new("Install Update Now"))
+                                .clicked()
+                            {
+                                let st = self.update_state.clone();
+                                let quit_flag = self.quit_requested.clone();
+                                let ctx = ui.ctx().clone();
+                                let dl = dl_url.clone();
+                                {
+                                    let mut g = st.lock().unwrap();
+                                    g.installing = true;
+                                    g.status = "Downloading & launching installer...".to_string();
+                                }
+                                thread::spawn(move || {
+                                    let res = download_and_run_installer(&dl);
+                                    {
+                                        let mut g = st.lock().unwrap();
+                                        g.installing = false;
+                                        match res {
+                                            Ok(()) => {
+                                                g.status =
+                                                    "Launching installer and restarting...".to_string();
+                                                quit_flag.store(true, Ordering::SeqCst);
+                                            }
+                                            Err(e) => {
+                                                g.status = format!("Install failed: {}", e);
+                                            }
+                                        }
+                                    }
+                                    ctx.request_repaint();
+                                });
+                            }
+                        }
+                        if let Some(ref url) = upd_release_url {
                             if ui.button("Open Release Page").clicked() {
                                 open_with_default_app(url);
                             }

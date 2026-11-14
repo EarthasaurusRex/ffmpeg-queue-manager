@@ -25,13 +25,39 @@ jobs:
       - name: Build Pure Rust Release
         run: cargo build --release
 
-      - name: Package Release Bundle
+      - name: Package Release Bundle & NSIS Installer
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist-release | Out-Null
           Copy-Item target\release\ffmpeg-queue-manager.exe dist-release\ffmpeg-queue-manager.exe
           Copy-Item src-tauri\bin\ffmpeg-x86_64-pc-windows-msvc.exe dist-release\ffmpeg.exe
           Copy-Item src-tauri\bin\ffprobe-x86_64-pc-windows-msvc.exe dist-release\ffprobe.exe
+
+          $tag = "${{ github.ref_name }}"
+          if ($tag -match '^v?(\d+\.\d+\.\d+.*)$') {
+            $version = $Matches[1]
+          } else {
+            $version = "0.2.0"
+          }
+
+          $makensisCmd = Get-Command makensis -ErrorAction SilentlyContinue
+          if ($makensisCmd) {
+            $makensis = $makensisCmd.Source
+          } else {
+            $candidates = @(
+              "C:\Program Files (x86)\NSIS\makensis.exe",
+              "C:\Program Files\NSIS\makensis.exe"
+            )
+            $makensis = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $makensis) {
+            choco install nsis -y
+            $makensis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          }
+
+          & $makensis "/DVERSION=$version" installer.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
           Compress-Archive -Path dist-release\* -DestinationPath ffmpeg-queue-manager-windows-x86_64.zip -Force
 
       - name: Publish GitHub Release
@@ -40,9 +66,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: 'FFmpeg Queue Manager ${{ github.ref_name }}'
-          body: 'Pure Rust GUI & CLI release bundle for Windows x86_64.'
+          body: 'Pure Rust GUI & CLI release installer and portable bundle for Windows x86_64.'
           draft: false
           prerelease: false
           files: |
+            FFmpeg-Queue-Manager_*_x64-setup.exe
             ffmpeg-queue-manager-windows-x86_64.zip
             dist-release\ffmpeg-queue-manager.exe

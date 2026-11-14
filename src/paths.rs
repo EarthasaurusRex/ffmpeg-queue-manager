@@ -291,7 +291,14 @@ pub fn open_with_default_app(target: &str) {
     }
 }
 
-pub fn fetch_latest_github_release() -> Result<(String, String), String> {
+#[derive(Clone, Debug)]
+pub struct GitHubReleaseInfo {
+    pub tag: String,
+    pub html_url: String,
+    pub setup_download_url: Option<String>,
+}
+
+pub fn fetch_latest_github_release() -> Result<GitHubReleaseInfo, String> {
     #[cfg(windows)]
     use std::os::windows::process::CommandExt;
     let mut cmd = std::process::Command::new("curl.exe");
@@ -328,5 +335,92 @@ pub fn fetch_latest_github_release() -> Result<(String, String), String> {
         .and_then(|u| u.as_str())
         .unwrap_or("https://github.com/EarthasaurusRex/ffmpeg-queue-manager/releases/latest")
         .to_string();
-    Ok((tag, html_url))
+
+    let setup_download_url = v
+        .get("assets")
+        .and_then(|a| a.as_array())
+        .and_then(|assets| {
+            assets.iter().find_map(|asset| {
+                let name = asset.get("name")?.as_str()?;
+                if name.to_ascii_lowercase().ends_with("-setup.exe") {
+                    asset
+                        .get("browser_download_url")
+                        .and_then(|u| u.as_str())
+                        .map(|s| s.to_string())
+                } else {
+                    None
+                }
+            })
+        });
+
+    Ok(GitHubReleaseInfo {
+        tag,
+        html_url,
+        setup_download_url,
+    })
+}
+
+pub fn download_and_run_installer(download_url: &str) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+
+        let dest = env::temp_dir().join("ffmpeg-queue-manager-update-setup.exe");
+        let dest_str = dest.to_string_lossy().to_string();
+
+        let mut dl_cmd = std::process::Command::new("curl.exe");
+        dl_cmd.args([
+            "-sSL",
+            "-L",
+            "-H",
+            "User-Agent: ffmpeg-queue-manager",
+            "-o",
+            &dest_str,
+            download_url,
+        ]);
+        dl_cmd.creation_flags(0x0800_0000);
+
+        let out = dl_cmd
+            .output()
+            .map_err(|e| format!("Failed to run curl.exe: {}", e))?;
+        if !out.status.success() {
+            return Err(format!(
+                "Failed to download installer: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            ));
+        }
+
+        let size = fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
+        if !dest.is_file() || size <= 1024 * 100 {
+            return Err(format!(
+                "Downloaded installer file is invalid or too small ({} bytes)",
+                size
+            ));
+        }
+
+        remove_daemon_info();
+
+        let current_exe = env::current_exe()
+            .map_err(|e| format!("Failed to resolve current executable: {}", e))?;
+        let exe_escaped = current_exe.to_string_lossy().replace('\'', "''");
+        let dest_escaped = dest_str.replace('\'', "''");
+        let ps_script = format!(
+            "Start-Sleep -Milliseconds 600; Start-Process -FilePath '{}' -ArgumentList '/S' -Wait; Start-Process -FilePath '{}'",
+            dest_escaped, exe_escaped
+        );
+
+        std::process::Command::new("powershell.exe")
+            .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &ps_script])
+            .creation_flags(0x0800_0000)
+            .spawn()
+            .map_err(|e| format!("Failed to launch updater script: {}", e))?;
+
+        return Ok(());
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = download_url;
+        Err("In-place NSIS installer update is only supported on Windows".to_string())
+    }
 }
