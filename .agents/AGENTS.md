@@ -1,0 +1,1 @@
+- ALWAYS ask for permission before pushing a tagged release build. You may commit changes locally, but do not push new v* tags without explicit user approval.
